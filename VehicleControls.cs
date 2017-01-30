@@ -22,21 +22,27 @@ namespace VehicleControls
 
             menu.OnItemSelect += (sender, item, index) =>
             {
-                if (item == newItem)
+                if (item != newItem)
                 {
-                    Vehicle car = LocalPlayer.Character.CurrentVehicle;
-                    if (car != null)
-                    {
-                        ToggleEngine(car);
-                    }
-                    else if (savedVehicle != null)
-                    {
-                        ToggleEngine(savedVehicle);
-                    }
-                    else
-                    {
-                        Screen.ShowNotification(ERROR_NOCAR);
-                    }
+                    return;
+                }
+
+                Vehicle car = LocalPlayer.Character.CurrentVehicle;
+
+                if (car == null
+                 && savedVehicle == null)
+                {
+                    Screen.ShowNotification(ERROR_NOCAR);
+                    return;
+                }
+
+                if (car != null)
+                {
+                    ToggleEngine(car);
+                }
+                else if (savedVehicle != null)
+                {
+                    ToggleEngine(savedVehicle);
                 }
             };
         }
@@ -46,20 +52,20 @@ namespace VehicleControls
             if (car.IsEngineRunning)
             {
                 Screen.ShowNotification("Engine is now ~r~off~w~.");
-                car.FuelLevel = 0;
+                car.IsDriveable = false;
                 car.IsEngineRunning = false;
             }
             else
             {
                 Screen.ShowNotification("Engine is now ~g~on~w~.");
-                car.FuelLevel = 65f;
+                car.IsDriveable = true;
                 car.IsEngineRunning = true;
             }
         }
 
         private void AddDoorLockItem(UIMenu menu)
         {
-            var newItem = new UIMenuItem("Toggle Door Lock");
+            var newItem = new UIMenuItem("Toggle Door Lock", "NOTE: This will also set this vehicle as saved vehicle.");
             menu.AddItem(newItem);
 
             menu.OnItemSelect += (sender, item, index) =>
@@ -67,17 +73,22 @@ namespace VehicleControls
                 if (item == newItem)
                 {
                     Vehicle car = LocalPlayer.Character.CurrentVehicle;
+
+                    if (car == null
+                     && savedVehicle == null)
+                    {
+                        Screen.ShowNotification(ERROR_NOCAR);
+                        return;
+                    }
+
                     if (car != null)
                     {
                         LockDoor(car);
-                    }
-                    else if (savedVehicle != null)
-                    {
-                        LockDoor(savedVehicle);
+                        SaveVehicle(car);
                     }
                     else
                     {
-                        Screen.ShowNotification(ERROR_NOCAR);
+                        LockDoor(savedVehicle);
                     }
                 }
             };
@@ -85,21 +96,23 @@ namespace VehicleControls
 
         private void LockDoor(Vehicle car)
         {
-            if (Function.Call<int>(Hash.GET_VEHICLE_DOOR_LOCK_STATUS, car) != 2)
-            {
-                Screen.ShowNotification("Doors are ~r~locked~w~.");
-                Function.Call(Hash.SET_VEHICLE_DOORS_LOCKED, car, 2);
-            }
-            else
+            bool doorLocked = (Function.Call<int>(Hash.GET_VEHICLE_DOOR_LOCK_STATUS, car) == 2);
+
+            if (doorLocked)
             {
                 Screen.ShowNotification("Doors are ~g~unlocked~w~.");
                 Function.Call(Hash.SET_VEHICLE_DOORS_LOCKED, car, 0);
+            }
+            else
+            {
+                Screen.ShowNotification("Doors are ~r~locked~w~.");
+                Function.Call(Hash.SET_VEHICLE_DOORS_LOCKED, car, 2);
             }
         }
 
         private void AddOpenDoorItem(UIMenu menu)
         {
-            var doors = new List<dynamic>
+            List<dynamic> doors = new List<dynamic>
             {
                 "Front Left",
                 "Front Right",
@@ -113,23 +126,29 @@ namespace VehicleControls
 
             menu.OnItemSelect += (sender, item, index) =>
             {
-                if (item == newItem)
+                if (item != newItem)
                 {
-                    int itemIndex = newItem.Index;
-                    string doorName = newItem.IndexToItem(itemIndex);
-                    Vehicle car = LocalPlayer.Character.CurrentVehicle;
-                    if (car != null)
-                    {
-                        ToggleDoor(car, itemIndex, doorName);
-                    }
-                    else if (savedVehicle != null)
-                    {
-                        ToggleDoor(savedVehicle, itemIndex, doorName);
-                    }
-                    else
-                    {
-                        Screen.ShowNotification(ERROR_NOCAR);
-                    }
+                    return;
+                }
+
+                int itemIndex = newItem.Index;
+                string doorName = newItem.IndexToItem(itemIndex);
+                Vehicle car = LocalPlayer.Character.CurrentVehicle;
+
+                if (car == null
+                 && savedVehicle == null)
+                {
+                    Screen.ShowNotification(ERROR_NOCAR);
+                    return;
+                }
+
+                if (car != null)
+                {
+                    ToggleDoor(car, itemIndex, doorName);
+                }
+                else
+                {
+                    ToggleDoor(savedVehicle, itemIndex, doorName);
                 }
             };
         }
@@ -144,7 +163,7 @@ namespace VehicleControls
             }
 
             float doorAngle = Function.Call<float>(Hash.GET_VEHICLE_DOOR_ANGLE_RATIO, car, index);
-            if (doorAngle == 0)
+            if (doorAngle == 0) // Door is closed
             {
                 Screen.ShowNotification(doorName + " Door is now ~g~open~w~.");
                 Function.Call(Hash.SET_VEHICLE_DOOR_OPEN, car, index, false, false);
@@ -156,6 +175,61 @@ namespace VehicleControls
             }
         }
 
+        private void AddLockSpeedItem(UIMenu menu)
+        {
+            List<dynamic> speeds = new List<dynamic>()
+            {
+                "None"
+            };
+            for (int i = 30; i < 121; i = i + 10)
+            {
+                speeds.Add(i + " KM/H");
+            }
+            UIMenuListItem newItem = new UIMenuListItem("Lock Max Speed", speeds, 0);
+            menu.AddItem(newItem);
+
+            menu.OnItemSelect += (sender, item, index) =>
+            {
+                if (item != newItem)
+                {
+                    return;
+                }
+
+                Vehicle car = LocalPlayer.Character.CurrentVehicle;
+
+                if (car == null
+                 && savedVehicle == null)
+                {
+                    Screen.ShowNotification(ERROR_NOCAR);
+                    return;
+                }
+
+                if (car != null)
+                {
+                    LockSpeed(car, newItem);
+                }
+                else
+                {
+                    LockSpeed(savedVehicle, newItem);
+                }
+            };
+        }
+
+        private void LockSpeed(Vehicle car, UIMenuListItem item)
+        {
+            string[] itemName = item.IndexToItem(item.Index).Split(' ');
+            if (itemName[0] == "None")
+            {
+                car.MaxSpeed = int.MaxValue;
+                Screen.ShowNotification($"Speedlimit has been removed.");
+                return;
+            }
+
+            float itemSpeed = float.Parse(itemName[0]) / 3.6f;
+            car.MaxSpeed = itemSpeed;
+            Screen.ShowNotification($"Speed has been limited to {itemName[0]} {itemName[1]}.");
+        }
+
         private void AddSaveVehicleItem(UIMenu menu)
         {
             var newItem = new UIMenuItem("Save vehicle");
@@ -163,33 +237,36 @@ namespace VehicleControls
 
             menu.OnItemSelect += (sender, item, index) =>
             {
-                if (item == newItem)
+                if (item != newItem)
                 {
-                    Vehicle car = LocalPlayer.Character.CurrentVehicle;
-                    if (car == null)
-                    {
-                        Screen.ShowNotification(ERROR_NOCAR);
-                        return;
-                    }
-                    else if (savedVehicle != null)
-                    {
-                        savedVehicle.AttachedBlip.Alpha = 0;
-                    }
-
-                    newItem.SetRightLabel(car.LocalizedName);
-                    SaveVehicle(car);
+                    return;
                 }
+
+                Vehicle car = LocalPlayer.Character.CurrentVehicle;
+
+                if (car == null)
+                {
+                    Screen.ShowNotification(ERROR_NOCAR);
+                    return;
+                }
+
+                SaveVehicle(car);
+                Screen.ShowNotification("Saved vehicle.");
             };
         }
 
         private void SaveVehicle(Vehicle car)
         {
-            Screen.ShowNotification("Saved vehicle.");
-            if (car.AttachedBlip == null)
+            if (savedVehicle != null)
             {
-                Blip blip = car.AttachBlip();
-                blip.Sprite = BlipSprite.PersonalVehicleCar;
+                foreach (Blip vehBlip in savedVehicle.AttachedBlips)
+                {
+                    vehBlip.Alpha = 0;
+                }
             }
+
+            Blip blip = car.AttachBlip();
+            blip.Sprite = BlipSprite.PersonalVehicleCar;
 
             savedVehicle = car;
         }
@@ -204,6 +281,7 @@ namespace VehicleControls
             AddEngineItem(menu);
             AddDoorLockItem(menu);
             AddOpenDoorItem(menu);
+            AddLockSpeedItem(menu);
             AddSaveVehicleItem(menu);
 
             menu.RefreshIndex();
